@@ -1,3 +1,5 @@
+
+
 var Engine = Matter.Engine,
     Render = Matter.Render,
     Runner = Matter.Runner,
@@ -19,8 +21,8 @@ var render = Render.create({
    element: document.body,
    engine: engine,
    options: {
-       width: 800,
-       height: 600,
+       width: innerWidth,
+       height: innerHeight,
        showAngleIndicator: true
    }
 });
@@ -31,11 +33,21 @@ Render.run(render);
 var runner = Runner.create();
 Runner.run(runner, engine);
 
+class things {
+    constructor() {
+        
+    }
+}
+statics = {
+    toptWall: Bodies.rectangle(400, 25, 2000, 50, { isStatic: true }),
+    floor: Bodies.rectangle(400, 600, 2000, 50, { isStatic: true }),
+    leftWall: Bodies.rectangle(25, 300, 50, 800, { isStatic: true }),
+}
+
 // add bodies
 Composite.add(world, [
-   Bodies.rectangle(400, 0, 800, 50, { isStatic: true }),
-   Bodies.rectangle(400, 600, 800, 50, { isStatic: true }),
-   Bodies.rectangle(800, 300, 50, 600, { isStatic: true }),
-   Bodies.rectangle(0, 300, 50, 600, { isStatic: true }),
-   Bodies.circle(200,300,50, { isStatic: false })
+   statics.toptWall,
+   statics.floor,
+   statics.leftWall,
+   
 ])
