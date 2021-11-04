@@ -1,62 +1,39 @@
 "use strict";
 
-const VP_WIDTH = 920, VP_HEIGHT = 550; //declare letiables to hold the viewport size
-const MAX_CRATES = 18; //declare a letiable to hold the max number of crates
+const VP_WIDTH = 920, VP_HEIGHT = 550; //declare variables to hold the viewport size
+const MAX_CRATES = 18; //declare a variable to hold the max number of crates
 const MAX_SPECIALS = 2;
 
 const CRATE_WIDTH = 30, CRATE_HEIGHT = 35;
-const player_X = 150, player_Y = 590; //declare a starting point for the player
-const FIZZBALL_D = 30; //declare a diameter for the player
+const FUZZBALL_X = 150, FUZZBALL_Y = 590; //declare a starting point for the fuzzball
+const FIZZBALL_D = 30; //declare a diameter for the fuzzball
 
-//declare global letiables to hold the framework objects
-let viewport, world, engine, body, elastic_constraint, Vector, ballLocation;
-let playerScore = 0;
+//declare global variables to hold the framework objects
+var viewport, world, engine, body, elastic_constraint, events;
+var playerScore = 0;
 
 // define our categories (as bit fields, there are up to 32 available) - we will use them to allow/non allow mouse interaction
 // https://brm.io/matter-js/docs/classes/MouseConstraint.html#properties
-let notinteractable = 0x0001, interactable = 0x0002;
+var notinteractable = 0x0001, interactable = 0x0002;
 
 
-let crates = []; //create an empty array that will be used to hold all the crates instances
-let ground;
-let leftwall;
-let rightwall;
+var crates = []; //create an empty array that will be used to hold all the crates instances
+var ground;
+var leftwall;
+var rightwall;
 
-let specials = [];
+var specials = [];
 
-let player;
-let launcher;
-let v1, fx, fy;
-  
+var fuzzball;
+var launcher;
+
+var timeScaleTarget = 1,
+	counter = 0;
+
+
 function apply_velocity() {
-	Matter.Body.setVelocity( player.body, {x: get_random(0, 20), y: get_random(0, 20)*-1});
+	Matter.Body.setVelocity( fuzzball.body, {x: get_random(0, 20), y: get_random(0, 20)*-1});
 };
-
-function playerToCurserVector (){
-	let pos = player.body.position;
-    v1 = createVector(pos.x, pos.y);
-	let curser = createVector(mouseX,mouseY);
-	fx = v1.x - curser.x;
-	fy = v1.y - curser.y;
-}
-
-function dodge() {
-	playerToCurserVector();
-	// console.log("force x:" + fx);
-	// console.log("force y:" + fy);
-	// console.log("v1:" + v1);
-	Matter.Body.setVelocity( player.body, { x: -fx/20 , y: -fy/20}  );
-};
-
-function mousePressed() {
-	if (mouseIsPressed) {
-		dodge();
-		console.log(mouseX);
-		console.log(mouseY);
-	}
-	
-}
-
 
 
 
@@ -100,7 +77,7 @@ function setup() {
 	engine = Matter.Engine.create();
 	world = engine.world;
 	body = Matter.Body;
-	Vector = Matter.Vector;
+	events = Matter.Events;
 
 	//enable the 'matter' mouse controller and attach it to the viewport object using P5s elt property
 	let vp_mouse = Matter.Mouse.create(viewport.elt); //the 'elt' is essentially a pointer the the underlying HTML element
@@ -115,7 +92,6 @@ function setup() {
 	Matter.World.add(world, elastic_constraint); //add the elastic constraint object to the world
 
 	level1();
-	playerToCurserVector ();
 
 	//attach some useful events to the matter engine; https://brm.io/matter-js/docs/classes/Engine.html#events
 	Matter.Events.on(engine, 'collisionEnd', collisions);
@@ -130,18 +106,18 @@ function level1(replay = false) {
 		ground.remove();
 		leftwall.remove();
 		rightwall.remove();
-		player.remove();
+		fuzzball.remove();
 		launcher.remove();
 	}
 	ground = new c_ground(VP_WIDTH/2, VP_HEIGHT+20, VP_WIDTH, 40, "ground"); //create a ground object using the ground class
 	leftwall = new c_ground(0, VP_HEIGHT/2, 20, VP_HEIGHT, "leftwall"); //create a left wall object using the ground class
 	rightwall = new c_ground(VP_WIDTH, VP_HEIGHT/2, 20, VP_HEIGHT, "rightwall"); //create a right wall object using the ground class
-	player = new c_player(VP_WIDTH/2, VP_HEIGHT/2, FIZZBALL_D, "player"); //create a player object
+	fuzzball = new c_fuzzball(VP_WIDTH/2, VP_HEIGHT/2, FIZZBALL_D, "fuzzball"); //create a fuzzball object
 
 
 
-	//create a launcher object using the player body
-	launcher = new c_launcher(VP_WIDTH/2, VP_HEIGHT/2, player.body);
+	//create a launcher object using the fuzzball body
+	launcher = new c_launcher(VP_WIDTH/2, VP_HEIGHT/2, fuzzball.body);
 
 }
 
@@ -152,8 +128,8 @@ function collisions(event) {
 		console.log(collide.bodyA.label + " - " + collide.bodyB.label);
 
 		if( 
-			(collide.bodyA.label == "player" && collide.bodyB.label == "crate") ||
-			(collide.bodyA.label == "crate" && collide.bodyB.label == "player")
+			(collide.bodyA.label == "fuzzball" && collide.bodyB.label == "crate") ||
+			(collide.bodyA.label == "crate" && collide.bodyB.label == "fuzzball")
 		) {
 			console.log("interesting collision");
 			score(100);
@@ -174,7 +150,7 @@ function paint_background() {
 
 
 function paint_assets() {	
-	player.show(); //show the player
+	fuzzball.show(); //show the fuzzball
 	launcher.show(); //show the launcher indicator 
 }
 
@@ -184,30 +160,29 @@ function draw() {
 	//special.rotate();
 
 	paint_background(); //paint the default background
-	
 
 	Matter.Engine.update(engine); //run the matter engine update
 	paint_assets(); //paint the assets
 
 	if(elastic_constraint.body !== null) {
-		let pos = elastic_constraint.body.position;
-		console.log(pos.x);
-		console.log(pos.y); //create an shortcut alias to the position (makes a short statement)	
+		let pos = elastic_constraint.body.position; //create an shortcut alias to the position (makes a short statement)	
 		fill("#ff0000"); //set a fill colour
 		ellipse(pos.x, pos.y, 20, 20); //indicate the body that has been selected
 
 		let mouse = elastic_constraint.mouse.position;
 		stroke("#00ff00");
+		line(pos.x, pos.y, mouse.x, mouse.y);
 	}
-	//create a trajectory path
-	// let pos = player.body.position;
-	// player = new c_trajectory(pos.x, pos.y, 15, "trajectory path"); //create a trajectory object
 
+	events.on(engine, 'afterUpdate', function(event) {
+		// tween the timescale for bullet time slow-mo
+		engine.timing.timeScale += (timeScaleTarget - engine.timing.timeScale) * 0.9;
+	});
 	
 
 	//https://brm.io/matter-js/docs/classes/SAT.html#methods
-	//if(Matter.SAT.collides(player.body, ground.body).collided == true) {
-	//	console.log("player to ground");
+	//if(Matter.SAT.collides(fuzzball.body, ground.body).collided == true) {
+	//	console.log("fuzzball to ground");
 	//}
 }
 
@@ -215,16 +190,17 @@ function draw() {
 function keyPressed() {
 	if (keyCode === ENTER) {
 		console.log("enter key press");
-		player.remove();
-		player = new c_player(player_X, player_Y, FIZZBALL_D, "player");
-		launcher.attach(player.body);
+		fuzzball.remove();
+		fuzzball = new c_fuzzball(FUZZBALL_X, FUZZBALL_Y, FIZZBALL_D, "fuzzball");
+		launcher.attach(fuzzball.body);
 	}
-
+}
+/*
 	if(keyCode === 32) {
 		console.log("space key press");
 		launcher.release(); //execute the release method
 	}
-}
+}*/
 
 
 function mouseReleased() {
@@ -232,3 +208,22 @@ function mouseReleased() {
 		launcher.release();
 	}, 60);
 }
+
+
+function keyPressed() {
+	if(keyCode==32) {
+			console.log("space key press");
+			setTimeout(() => {
+				if (timeScaleTarget < 1) {
+					timeScaleTarget = 1;
+				} else {
+					timeScaleTarget = 0;
+				}
+			}, 1000);
+			
+	}
+}
+
+
+
+	
